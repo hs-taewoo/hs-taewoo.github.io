@@ -1,0 +1,465 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow-y: scroll;  /* ✅ 세로 스크롤 */
+  overflow-x: hidden;
+  background: #fff;
+  font-family: sans-serif;
+  -ms-overflow-style: none;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* 세로 스크롤 영역 */
+.scroll-area {
+  /* 고정 위치로 변경: 세로 스크롤 시 Y 이동 방지 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  /* let content define width so panels line up correctly */
+  width: auto;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  transition: transform 0.1s linear;
+  will-change: transform;
+  z-index: 1; /* 배경 이미지보다 위에 보이도록 */
+}
+
+@media screen and (max-width: 768px) {
+  .scroll-area {
+    /* allow natural width on mobile as well */
+    width: auto;
+    overflow-x: visible;
+  }
+}
+
+/* 각 패널 */
+.panel {
+  flex: 0 0 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* 중앙 정렬: 사진이 정중앙에 보이도록 */
+  position: relative;
+  padding: 0; /* 패딩 제거: 중앙 정렬이 정확히 되도록 함 */
+}
+
+/* 모바일 화면에서의 패널 패딩 조정 */
+@media screen and (max-width: 768px) {
+  .panel {
+    padding: 0 20px;
+  }
+}
+
+/* 중앙 박스 */
+/* ...existing code... */
+
+/* 중앙 박스 */
+.paint {
+  /* 원래 크기대로: 각 패널 전체 화면을 사용해 이미지를 크게 보여줍니다 */
+  width: 100vw; /* 패널 전체 너비 */
+  height: 100vh; /* 패널 전체 높이 */
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center center;
+  /*
+    이미지 크기를 화면에 맞게 조정합니다.
+    데스크톱에서는 contain으로 전체 이미지를 보여주고
+    모바일에서는 높이에 맞춰 표시합니다.
+  */
+  background-size: contain;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 모바일 화면에서 이미지 크기 조정 */
+@media screen and (max-width: 768px) {
+  .paint {
+    /* 모바일에서도 전체 화면을 사용하여 원래 크기(화면 기준)로 보이게 함 */
+    width: 100vw;
+    height: 100vh;
+    background-size: contain;
+    background-position: center center;
+  }
+}
+
+/* 오른쪽 텍스트 */
+.background {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 100vw;
+  height: 100vh;
+  transform: none;
+  background-image: url('images/background.png');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ______                _     _   _  _____  _____  ______  _   _  _____  _   __
+  |  _  \              | |   | | | |/  ___||  ___| |  ___|| | | |/  __ \| | / /
+  | | | |  ___   _ __  | |_  | | | |\ `--. | |__   | |_   | | | || /  \/| |/ / 
+  | | | | / _ \ | '_ \ | __| | | | | `--. \|  __|  |  _|  | | | || |    |    \ 
+  | |/ / | (_) || | | || |_  | |_| |/\__/ /| |___  | |    | |_| || \__/\| |\  \
+  |___/   \___/ |_| |_| \__|  \___/ \____/ \____/  \_|     \___/  \____/\_| \_/ */
+/* 이거 쓰면 고장남 시발 왜 추천한거야 코파일럿 미친새끼 */
+  /* ⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇ */
+  
+/* 모바일에서 배경 이미지 크기 조정 */
+/* @media screen and (max-width: 768px) {
+  .background {
+    background-size: 300vw 100vh;
+    background-position: center center;
+  }
+} */
+/* ...existing code... */
+
+/* paint별 이미지 지정: paint1, paint2, paint3를 사용합니다. */
+.paint.paint1 { background-image: url('images/paint1.png'); }
+/* .paint.paint2 { background-image: url('paint2.png'); } */
+.paint.paint3 { background-image: url('images/paint3.png'); }
+.paint.paint4 { background-image: url('images/paint4.png'); }
+.paint.paint5 { background-image: url('images/paint5.png'); cursor: pointer; }
+.paint.paint6 { background-image: url('images/door__.png'); cursor: pointer; }
+
+.paint.paint0 {
+  background-image: url('images/main__paint.png');
+  opacity: 0; /* 초기에는 투명 */
+  transition: opacity 1000ms ease-in; /* 페이드인 애니메이션 */
+  will-change: opacity;
+}
+
+/* 인트로가 끝난 후 페이드인 */
+.paint.paint0.show {
+  opacity: 1;
+}
+
+
+/* ---------- Intro styles ---------- */
+.intro {
+  position: fixed;
+  inset: 0; /* top:0; right:0; bottom:0; left:0 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  overflow: hidden;
+}
+.intro-img {
+  position: absolute;
+  width: 100vw; /* 화면 너비에 맞게 설정 */
+  height: 100vh; /* 화면 높이에 맞게 설정 */
+  max-width: 150vw;
+  max-height: 200vh;
+  width: auto;
+  height: auto;
+  transition: opacity 900ms ease, transform 900ms cubic-bezier(.2,.9,.25,1);
+  will-change: opacity, transform;
+  pointer-events: none; /* 클릭은 오버레이 전체에서 받음 */
+}
+.intro-bg {
+  z-index: 1;
+  opacity: 1;
+}
+
+/* 모바일에서 인트로 배경 이미지 크기 조정 */
+@media screen and (max-width: 768px) {
+  .intro-bg {
+    height: 100vh;
+    width: auto;
+    min-width: 100vw;
+  }
+}
+
+.intro-top {
+  z-index: 2;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* 인트로가 숨겨질 때 적용되는 상태 (클릭 시 추가) */
+.intro.hide .intro-bg {
+  opacity: 0; /* 1.png는 페이드아웃 */
+  transition-duration: 700ms;
+}
+.intro.hide .intro-top {
+  opacity: 0;
+  transform: translateY(-40vh) scale(0.98); /* 2.png는 위로 부드럽게 밀려올라가며 사라짐 */
+  transition-duration: 1000ms;
+}
+
+/* 애니메이션이 끝난 뒤 보이지 않도록 보조 클래스 */
+.intro.removed {
+  display: none !important;
+}
+
+/* Door transition */
+.paint.door-opening-start { transition: transform 180ms ease-out; transform: scale(1.08); }
+.paint.door-opening { transition: transform 900ms ease-in; transform: scale(8); }
+
+.door-fade { position: fixed; inset: 0; background: #000; opacity: 0; z-index: 9998; transition: opacity 600ms ease; pointer-events: none; }
+.door-fade.show { opacity: 1; }
+
+/* Map container for museum.html */
+#map {
+  position: absolute;
+  inset: 0; /* top:0; right:0; bottom:0; left:0 */
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+/* Simple DOM marker style used by MapLibre initialization */
+.marker {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e74c3c;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+
+.marker.preview {
+  opacity: 0.85;
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.marker.preview:hover { transform: scale(1.08); }
+
+/* Create-exhibit form styles */
+.create-form {
+  position: fixed;
+  z-index: 99999;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%) translateY(110%);
+  transition: transform 300ms cubic-bezier(.2,.9,.25,1), opacity 180ms ease;
+  width: min(92vw, 420px);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  padding: 12px;
+  font-size: 14px;
+  color: #222;
+  opacity: 0;
+}
+.create-form.open { transform: translateX(-50%) translateY(0); opacity: 1; }
+.create-form-header { font-weight: 700; margin-bottom: 6px; }
+.create-form label { display: block; font-size: 12px; margin-top: 6px; }
+.create-form input[type="text"], .create-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.create-form textarea { resize: vertical; }
+.create-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.btn { padding: 6px 10px; border-radius: 4px; border: 0; cursor: pointer; background: #eee; }
+.btn.primary { background: #2b8aef; color: #fff; }
+.ex-popup p { margin: 6px 0 0; font-size: 13px; color: #333; }
+
+/* Card-style popup (matches design screenshot) */
+.maplibregl-popup-content .ex-popup {
+  /* aggressive compact style: very small footprint */
+  min-width: 160px;
+  max-width: 300px;
+  width: auto;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 8px;
+  box-shadow: 0 10px 30px rgba(17,24,39,0.08);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial;
+  color: #0f172a;
+}
+.ex-popup-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ex-popup-left { display:flex; gap:8px; align-items:center; }
+.ex-pin { display:inline-flex; width:16px; height:16px; align-items:center; justify-content:center; background:#e6f0ff; color:#1e3a8a; border-radius:5px; font-size:11px; }
+.ex-title { font-weight:700; font-size:13px; color:#0f172a; }
+.ex-sub { font-size:11px; color:#6b7280; margin-top:0; }
+.ex-close { background:transparent; border:0; font-size:12px; color:#9ca3af; cursor:pointer; padding:4px; border-radius:6px; }
+.ex-close:hover { background:#f3f4f6; }
+.ex-popup-actions { display:inline-flex; gap:6px; margin-left:8px; align-items:center; }
+.ex-btn { padding:6px 8px; border-radius:999px; font-weight:600; border:0; cursor:pointer; font-size:12px; min-height:28px; }
+.ex-btn.primary { background:#1e90ff; color:#fff; box-shadow: 0 6px 14px rgba(30,144,255,0.12); }
+.ex-btn.ghost { background:#f3f4f6; color:#111827; }
+
+/* ensure popup arrow doesn't obscure rounded card */
+.maplibregl-popup-tip { display:none; }
+
+/* Modern bottom sheet styles */
+body.form-open { overflow: hidden; }
+
+.create-form {
+  position: fixed;
+  z-index: 99999;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(110%);
+  transition: transform 350ms cubic-bezier(.4,0,.2,1), opacity 220ms ease;
+  pointer-events: none;
+  width: min(560px, 92vw);
+}
+
+.create-form.open {
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.create-form-overlay {
+  /* overlay removed: keep element in DOM for accessibility but hide it so nothing covers the map */
+  display: none !important;
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.create-form.open .create-form-overlay {
+  display: none !important;
+}
+
+.create-form-content {
+  position: relative;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px 20px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  /* stronger, more concentrated shadow so the card reads without dark overlay */
+  box-shadow: 0 18px 40px rgba(0,0,0,0.18), 0 6px 18px rgba(0,0,0,0.08);
+}
+
+.create-form-handle {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 4px;
+  background: #e1e1e1;
+  border-radius: 2px;
+}
+
+.create-form-header {
+  margin: 12px 0 24px;
+}
+
+.create-form-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #222;
+}
+
+.create-form-header p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.create-form-body {
+  margin-bottom: 24px;
+}
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.input-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.input-group input,
+.input-group textarea {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #f8f8f8;
+  transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+.input-group input:focus,
+.input-group textarea:focus {
+  outline: none;
+  border-color: #2b8aef;
+  background: #fff;
+}
+
+.input-group small {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #666;
+}
+
+.location-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.location-dot {
+  width: 12px;
+  height: 12px;
+  background: #e74c3c;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.location-text {
+  font-size: 13px;
+  color: #666;
+}
+
+.create-form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn.primary {
+  background: #2b8aef;
+  color: #fff;
+}
+
+.btn:not(.primary) {
+  background: #f0f0f0;
+  color: #333;
+}

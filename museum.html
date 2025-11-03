@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>민스트라다무스 민결우스 화가전</title>
+  <!-- Page fade-in: full-screen black overlay that fades out on load -->
+  <style>
+    /* Keep page content at full opacity; use a fixed ::before overlay to show black on first paint */
+    /* no direct opacity on body; overlay handles the initial black screen */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 2147483646; /* very high so it covers everything */
+      opacity: 1;
+      transition: opacity 420ms ease-out;
+      pointer-events: auto; /* block interactions until faded */
+    }
+    /* When fade-in class is added, hide the overlay */
+    body.fade-in::before {
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+  <script>
+    // Fade overlay out as soon as DOM is ready.
+    window.addEventListener('DOMContentLoaded', () => {
+      // requestAnimationFrame ensures the initial paint with the overlay occurs
+      requestAnimationFrame(() => document.body.classList.add('fade-in'));
+    });
+  </script>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" />
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:opsz@32..128&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 인트로 화면 -->
+  <div id="intro"></div>
+
+  <div id="map"></div>
+
+  <!-- Create-exhibit floating form (hidden until map click) -->
+  <div id="createForm" class="create-form" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="create-form-overlay"></div>
+    <div class="create-form-content">
+      <div class="create-form-handle"></div>
+      <div class="create-form-header">
+        <h2>새로운 전시 지점</h2>
+        <p>선택한 위치에 전시 공간을 만듭니다</p>
+      </div>
+      <div class="create-form-body">
+        <div class="input-group">
+          <label for="exTitle">전시 제목</label>
+          <input id="exTitle" type="text" placeholder="전시의 제목을 입력하세요">
+          <small>공간을 대표하는 이름이나 제목을 입력하세요</small>
+        </div>
+        <div class="input-group">
+          <label for="exDesc">전시 설명</label>
+          <textarea id="exDesc" rows="4" placeholder="이 공간에 대한 설명을 입력하세요"></textarea>
+          <small>관람객에게 보여질 설명문을 작성하세요 (선택)</small>
+        </div>
+        <div class="location-preview">
+          <div class="location-dot"></div>
+          <span class="location-text">선택된 위치에 표시됩니다</span>
+        </div>
+      </div>
+      <div class="create-form-actions">
+        <button id="cancelEx" class="btn">취소</button>
+        <button id="saveEx" class="btn primary">전시 공간 만들기</button>
+      </div>
+    </div>
+  </div>
+  <!-- Review modal -->
+  <div id="reviewForm" class="create-form" role="dialog" aria-modal="true" aria-hidden="true" style="display:none;">
+    <div class="create-form-overlay"></div>
+    <div class="create-form-content">
+      <div class="create-form-handle"></div>
+      <div class="create-form-header">
+        <h2>리뷰 작성</h2>
+        <p>전시장에 대한 짧은 리뷰를 남겨주세요</p>
+      </div>
+      <div class="create-form-body">
+        <div class="input-group">
+          <label for="reviewTitle">제목</label>
+          <input id="reviewTitle" type="text" placeholder="리뷰 제목을 입력하세요">
+        </div>
+        <div class="input-group">
+          <label for="reviewContent">내용</label>
+          <textarea id="reviewContent" rows="6" placeholder="리뷰 내용을 입력하세요"></textarea>
+        </div>
+      </div>
+      <div class="create-form-actions">
+        <button id="cancelReview" class="btn">취소</button>
+        <button id="saveReviewBtn" class="btn primary">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+  <script type="module">
+  import { initSupabase, saveExhibit, fetchExhibits, deleteExhibit, saveReview, fetchReviews } from './supabase.js';
+
+    // Supabase is auto-initialized inside `supabase.js` (do not read config from HTML).
+    // 인트로이 제거하고 스크롤 활성화 (원래 동작 유지)
+    setTimeout(() => {
+      document.body.style.overflow = "auto";
+      const intro = document.getElementById('intro');
+      if (intro) intro.remove();
+    }, 2500);
+
+    // 기본 중심 좌표: [lng, lat]
+    const CENTER = [126.923425, 37.627486];
+
+    // MapLibre 지도 초기화: raster tiles 사용
+    const map = new maplibregl.Map({
+      container: 'map',
+      // Prevent zooming beyond available tile levels which can cause blank tiles
+      minZoom: 3,
+      maxZoom: 19,
+      style: {
+        version: 8,
+        sources: {
+          'raster-tiles': {
+            type: 'raster',
+            tiles: [
+              // 기본값: OpenStreetMap 타일. 원하면 OpenFreeMap의 타일 URL로 교체하세요.
+              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
+          }
+        },
+        layers: [
+          { id: 'simple-tiles', type: 'raster', source: 'raster-tiles', minzoom: 0, maxzoom: 19 }
+        ]
+      },
+      center: CENTER,
+      zoom: 18
+    });
+
+    // 컨트롤 추가
+    map.addControl(new maplibregl.NavigationControl(), 'top-left');
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 80, unit: 'metric' }), 'bottom-left');
+    map.addControl(new maplibregl.AttributionControl({ compact: true }));
+
+    // Load existing exhibits from DB and show markers
+    async function loadExhibits() {
+      try {
+        if (typeof fetchExhibits !== 'function') return;
+        const res = await fetchExhibits();
+        if (res && res.error) {
+          console.error('fetchExhibits error', res.error);
+          showToast('DB 로드 실패', 1400);
+          return;
+        }
+        const rows = res && res.data ? res.data : [];
+        let count = 0;
+        for (const r of rows) {
+          const title = r.title || 'Untitled';
+          const desc = r.description || '';
+          const lat = Number(r.lat);
+          const lng = Number(r.lng);
+          if (!isFinite(lat) || !isFinite(lng)) continue;
+
+          const el = createMarkerEl('marker');
+          const marker = new maplibregl.Marker(el).setLngLat([lng, lat]).addTo(map);
+          const popupHtml = `
+            <div class="ex-popup" data-id="${r.id || ''}" data-lng="${lng}" data-lat="${lat}">
+                <div class="ex-popup-row">
+                  <div class="ex-popup-left">
+                    <span class="ex-pin">📍</span>
+                    <div>
+                      <div class="ex-title">${escapeHtml(title)}</div>
+                      ${desc ? `<div class="ex-sub">${escapeHtml(desc)}</div>` : `<div class="ex-sub">Loaded from DB</div>`}
+                    </div>
+                  </div>
+                  <button class="ex-close" aria-label="close">✕</button>
+                </div>
+                <div class="ex-popup-actions">
+                  <button class="ex-btn primary" data-action="visit">Visit</button>
+                  <button class="ex-btn ghost" data-action="share">Share</button>
+                  <button class="ex-btn ghost" data-action="review">리뷰</button>
+                  <button class="ex-btn ghost" data-action="delete">Delete</button>
+                </div>
+              </div>
+          `;
+          const popup = new maplibregl.Popup({ offset: 25, closeButton: false, closeOnClick: false }).setHTML(popupHtml);
+          marker.setPopup(popup);
+
+          const markerEl = marker.getElement();
+          if (markerEl) {
+            markerEl.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              if (typeof marker.togglePopup === 'function') {
+                marker.togglePopup();
+                const p = marker.getPopup();
+                try { if (p && typeof p.isOpen === 'function' && p.isOpen()) refreshPopupReviews(p); } catch(e) { /* ignore */ }
+              } else {
+                const p = marker.getPopup();
+                if (p.isOpen()) {
+                  p.remove();
+                } else {
+                  p.addTo(map);
+                  try { refreshPopupReviews(p); } catch(e) { /* ignore */ }
+                }
+              }
+            });
+          }
+          permanentMarkers.push({ marker, title, desc, lng, lat, id: r.id });
+          count++;
+        }
+        if (count > 0) showToast(`${count}개의 전시를 불러왔습니다`, 1200);
+      } catch (err) {
+        console.error('loadExhibits error', err);
+        showToast('전시 로드 중 오류', 1500);
+      }
+    }
+
+    map.on('load', () => {
+      loadExhibits();
+    });
+
+    // Helper to create marker DOM element
+    function createMarkerEl(cls = 'marker') {
+      const d = document.createElement('div');
+      d.className = cls;
+      d.style.cursor = 'pointer';
+      return d;
+    }
+
+    // 기본 마커: red-dot DOM 마커 사용 (스타일은 style.css에서 정의)
+    const predefinedEl = createMarkerEl('marker');
+    const predefined = new maplibregl.Marker(predefinedEl).setLngLat(CENTER).addTo(map);
+    const predefinedHtml = `
+      <div class="ex-popup">
+        <div class="ex-popup-row" data-lng="${CENTER[0]}" data-lat="${CENTER[1]}">
+          <div class="ex-popup-left">
+            <span class="ex-pin">📍</span>
+            <div>
+              <div class="ex-title">민스트라다무스의 화가전</div>
+              <div class="ex-sub">minstra.</div>
+            </div>
+          </div>
+          <button class="ex-close" aria-label="close">✕</button>
+        </div>
+        <div class="ex-popup-actions">
+          <button class="ex-btn primary" data-action="visit">Visit</button>
+          <button class="ex-btn ghost" data-action="share">Share</button>
+        </div>
+      </div>
+    `;
+
+    const popup = new maplibregl.Popup({ 
+      offset: 25,
+      closeButton: false,
+      closeOnClick: false
+    }).setHTML(predefinedHtml);
+
+    predefined.setPopup(popup);
+    
+    // Enable marker click to toggle popup
+    const predefinedEl2 = predefined.getElement();
+    if (predefinedEl2) {
+      predefinedEl2.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (typeof predefined.togglePopup === 'function') {
+          predefined.togglePopup();
+          const p = predefined.getPopup();
+          try { if (p && typeof p.isOpen === 'function' && p.isOpen()) refreshPopupReviews(p); } catch(e) { /* ignore */ }
+        } else {
+          const p = predefined.getPopup();
+          if (p.isOpen()) {
+            p.remove();
+          } else {
+            p.addTo(map);
+            try { refreshPopupReviews(p); } catch(e) { /* ignore */ }
+          }
+        }
+      });
+    }
+
+    // marker storage
+    const permanentMarkers = [];
+    let previewMarker = null; // temporary marker shown after click before saving
+
+    // 지도 클릭: 전시 지점을 생성하기 위한 입력 폼을 표시
+    const createForm = document.getElementById('createForm');
+    const titleInput = createForm.querySelector('#exTitle');
+    const descInput = createForm.querySelector('#exDesc');
+    const saveBtn = createForm.querySelector('#saveEx');
+    const cancelBtn = createForm.querySelector('#cancelEx');
+
+    function showCreateForm(lngLat) {
+      // Show bottom sheet and store coordinates to dataset
+      createForm.dataset.lng = lngLat.lng;
+      createForm.dataset.lat = lngLat.lat;
+      titleInput.value = '';
+      descInput.value = '';
+      createForm.classList.add('open');
+      createForm.setAttribute('aria-hidden', 'false');
+      titleInput.focus();
+    }
+
+    function hideCreateForm() {
+      createForm.classList.remove('open');
+      createForm.setAttribute('aria-hidden', 'true');
+    }
+
+  // prevent clicks inside content from closing (keep behavior but overlay is hidden)
+  const formContent = createForm.querySelector('.create-form-content');
+  if (formContent) formContent.addEventListener('click', (ev) => ev.stopPropagation());
+
+    // helper: simple escape to avoid HTML injection in popups
+    function escapeHtml(s) {
+      if (!s) return '';
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Reviews: fetch and render inside popup when opened
+    async function refreshPopupReviews(popupOrEl) {
+      if (!popupOrEl || typeof fetchReviews !== 'function') return;
+      try {
+        let el = null;
+        // Accept either a maplibre Popup object or a DOM element or an exhibit id
+        if (popupOrEl && typeof popupOrEl.getElement === 'function') {
+          el = popupOrEl.getElement();
+        } else if (popupOrEl instanceof Element) {
+          el = popupOrEl;
+        } else {
+          // treat as an exhibit id and find the popup element
+          el = document.querySelector(`.maplibregl-popup .ex-popup[data-id="${popupOrEl}"]`);
+        }
+        if (!el) return;
+        const wrapper = el.classList && el.classList.contains('ex-popup') ? el : el.querySelector('.ex-popup');
+        if (!wrapper) return;
+        const id = wrapper.dataset.id;
+        let container = wrapper.querySelector('.ex-reviews');
+        if (!container) {
+          container = document.createElement('div');
+          container.className = 'ex-reviews';
+          container.style.marginTop = '8px';
+          container.style.borderTop = '1px solid rgba(0,0,0,0.06)';
+          container.style.paddingTop = '8px';
+          wrapper.appendChild(container);
+        }
+        if (!id) {
+          container.innerHTML = '<div class="ex-reviews-empty">저장된 리뷰가 없습니다</div>';
+          return;
+        }
+  const res = await fetchReviews(id);
+        if (res && res.error) {
+          console.error('fetchReviews error', res.error);
+          container.innerHTML = '<div class="ex-reviews-empty">리뷰 로드 실패</div>';
+          return;
+        }
+        const rows = res && res.data ? res.data : [];
+        if (!rows.length) {
+          container.innerHTML = '<div class="ex-reviews-empty">등록된 리뷰가 없습니다</div>';
+          return;
+        }
+        container.innerHTML = rows.map(r => {
+          const title = escapeHtml(r.title || '');
+          const content = escapeHtml(r.content || '');
+          const date = r.created_at ? new Date(r.created_at).toLocaleString() : '';
+          return `
+            <div class="ex-review">
+              <div class="ex-review-title">${title}</div>
+              <div class="ex-review-content">${content}</div>
+              <div class="ex-review-date">${date}</div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('refreshPopupReviews error', err);
+      }
+    }
+
+    map.on('click', (e) => {
+      // 마커나 팝업을 클릭한 경우 form을 열지 않음
+      if (e.originalEvent && (
+        e.originalEvent.defaultPrevented || // 마커 클릭 핸들러에서 이미 처리됨
+        e.originalEvent.target.closest('.maplibregl-popup') // 팝업 클릭
+      )) {
+        return;
+      }
+
+      // create or move a preview marker at the clicked location so user sees where the exhibit will be
+      const lngLat = e.lngLat;
+      if (!previewMarker) {
+        const previewEl = createMarkerEl('marker preview');
+        previewMarker = new maplibregl.Marker(previewEl).setLngLat([lngLat.lng, lngLat.lat]).addTo(map);
+        // stop propagation on the wrapper so marker clicks don't trigger map click
+        const wrapper = previewMarker.getElement && previewMarker.getElement();
+        if (wrapper) wrapper.addEventListener('click', (ev) => ev.stopPropagation());
+      } else {
+        previewMarker.setLngLat([lngLat.lng, lngLat.lat]);
+      }
+
+      // show bottom-sheet form (store clicked coordinates)
+      showCreateForm(e.lngLat);
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      const title = titleInput.value.trim();
+      const desc = descInput.value.trim();
+      if (!title) { alert('제목을 입력하세요.'); titleInput.focus(); return; }
+      const lng = parseFloat(createForm.dataset.lng);
+      const lat = parseFloat(createForm.dataset.lat);
+
+      // create a permanent marker using the same red-dot element
+      const el = createMarkerEl('marker');
+      const marker = new maplibregl.Marker(el).setLngLat([lng, lat]).addTo(map);
+      const popupHtml = `
+        <div class="ex-popup" data-lng="${lng}" data-lat="${lat}">
+            <div class="ex-popup-row">
+              <div class="ex-popup-left">
+                <span class="ex-pin">📍</span>
+                <div>
+                  <div class="ex-title">${escapeHtml(title)}</div>
+                  ${desc ? `<div class="ex-sub">${escapeHtml(desc)}</div>` : `<div class="ex-sub">Selected location</div>`}
+                </div>
+              </div>
+              <button class="ex-close" aria-label="close">✕</button>
+            </div>
+            <div class="ex-popup-actions">
+              <button class="ex-btn primary" data-action="visit">Visit</button>
+              <button class="ex-btn ghost" data-action="share">Share</button>
+              <button class="ex-btn ghost" data-action="review">리뷰</button>
+              <button class="ex-btn ghost" data-action="delete">Delete</button>
+            </div>
+          </div>
+      `;
+
+      const popup = new maplibregl.Popup({ 
+        offset: 25,
+        closeButton: false,
+        closeOnClick: false
+      }).setHTML(popupHtml);
+
+      marker.setPopup(popup);
+      
+      // Enable marker click to toggle popup
+      const markerEl = marker.getElement();
+      if (markerEl) {
+        markerEl.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          if (typeof marker.togglePopup === 'function') {
+            marker.togglePopup();
+            const p = marker.getPopup();
+            try { if (p && typeof p.isOpen === 'function' && p.isOpen()) refreshPopupReviews(p); } catch(e) { /* ignore */ }
+          } else {
+            const p = marker.getPopup();
+            if (p.isOpen()) {
+              p.remove();
+            } else {
+              p.addTo(map);
+              try { refreshPopupReviews(p); } catch(e) { /* ignore */ }
+            }
+          }
+        });
+      }
+      permanentMarkers.push({ marker, title, desc, lng, lat });
+
+      // Try to save to Supabase (if initialized) and attach DB id to the marker popup
+      try {
+        if (typeof saveExhibit === 'function') {
+          const res = await saveExhibit({ title, description: desc, lat, lng });
+          if (res && res.error) {
+            console.error('Supabase insert error', res.error);
+            showToast('DB 저장 실패', 1400);
+          } else if (res && res.data) {
+            const inserted = res.data;
+            const id = inserted.id || inserted.ID || null;
+            // update the last pushed marker entry with id
+            const last = permanentMarkers[permanentMarkers.length - 1];
+            if (last) last.id = id;
+            // update popup HTML to include data-id
+            try {
+              const p = marker.getPopup();
+              if (p) {
+                const newHtml = `
+                  <div class="ex-popup" data-id="${id || ''}" data-lng="${lng}" data-lat="${lat}">
+                      <div class="ex-popup-row">
+                        <div class="ex-popup-left">
+                          <span class="ex-pin">📍</span>
+                          <div>
+                            <div class="ex-title">${escapeHtml(title)}</div>
+                            ${desc ? `<div class="ex-sub">${escapeHtml(desc)}</div>` : `<div class="ex-sub">Selected location</div>`}
+                          </div>
+                        </div>
+                        <button class="ex-close" aria-label="close">✕</button>
+                      </div>
+                      <div class="ex-popup-actions">
+                        <button class="ex-btn primary" data-action="visit">Visit</button>
+                        <button class="ex-btn ghost" data-action="share">Share</button>
+                        <button class="ex-btn ghost" data-action="review">리뷰</button>
+                        <button class="ex-btn ghost" data-action="delete">Delete</button>
+                      </div>
+                    </div>
+                `;
+                p.setHTML(newHtml);
+              }
+            } catch (err) {
+              console.warn('Could not update popup HTML with id', err);
+            }
+            showToast('전시 저장됨 (DB)', 1100);
+          } else {
+            showToast('전시 저장됨', 1100);
+          }
+        }
+      } catch (err) {
+        console.error('Error saving exhibit to DB', err);
+        showToast('DB 저장 중 오류', 1500);
+      }
+
+      // remove preview marker if present
+      if (previewMarker) { previewMarker.remove(); previewMarker = null; }
+
+      hideCreateForm();
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      // remove preview marker when cancelling
+      if (previewMarker) { previewMarker.remove(); previewMarker = null; }
+      hideCreateForm();
+    });
+
+  // Delegated handler for popup buttons (Paint / Share / Close)
+  document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.ex-btn, .ex-close');
+      if (!btn) return;
+      // find popup wrapper
+      const popupEl = btn.closest('.ex-popup');
+      if (!popupEl) return;
+
+      // Close button
+      if (btn.classList.contains('ex-close')) {
+        const mapPopup = popupEl.closest('.maplibregl-popup');
+        if (mapPopup) mapPopup.remove();
+        return;
+      }
+
+      // Action buttons
+      const action = btn.dataset.action;
+      const lat = popupEl.dataset.lat;
+      const lng = popupEl.dataset.lng;
+
+      if (action === 'share') {
+        // prefer sharing the Visit URL using the exhibit name if available
+        const titleEl = popupEl.querySelector('.ex-title');
+        const name = titleEl ? titleEl.textContent.trim() : '';
+        let shareUrl = '';
+        if (name) {
+          const u = new URL('visit.html', location.href);
+          u.searchParams.set('name', name);
+          shareUrl = u.toString();
+        } else if (lat && lng) {
+          const u = new URL(location.href);
+          u.searchParams.set('lat', lat);
+          u.searchParams.set('lng', lng);
+          shareUrl = u.toString();
+        }
+
+        if (shareUrl) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareUrl).then(() => showToast('링크가 복사되었습니다'));
+          } else {
+            showToast('클립보드 복사 실패');
+          }
+        } else {
+          showToast('공유할 링크를 생성할 수 없습니다');
+        }
+      }
+
+      if (action === 'review') {
+        // Open review modal and store target popup/exhibit id
+        const id = popupEl.dataset.id || null;
+        openReviewModal({ popupEl, exhibitId: id, lat: popupEl.dataset.lat, lng: popupEl.dataset.lng });
+        return;
+      }
+
+      if (action === 'visit') {
+        // open a new tab / page with the exhibition name as parameter
+        // If the exhibit is the predefined "민스트라다무스의 화가전", go to index.html
+        const titleEl = popupEl.querySelector('.ex-title');
+        const name = titleEl ? titleEl.textContent.trim() : '';
+        if (name) {
+          let u;
+          if (name === '민스트라다무스의 화가전') {
+            u = new URL('/index.html', location.href);
+          } else {
+            u = new URL('/visit.html', location.href);
+            u.searchParams.set('name', name);
+          }
+          window.open(u.toString(), '_blank');
+        } else {
+          showToast('전시 이름이 없습니다');
+        }
+      }
+
+      if (action === 'delete') {
+        // Delete exhibit from DB (requires data-id on popup)
+        const id = popupEl.dataset.id;
+        if (!id) {
+          showToast('삭제할 전시 ID가 없습니다');
+          return;
+        }
+        const ok = confirm('이 전시를 삭제하시겠습니까?');
+        if (!ok) return;
+        try {
+          if (typeof deleteExhibit === 'function') {
+            const res = await deleteExhibit(id);
+            if (res && res.error) {
+              console.error('deleteExhibit error', res.error);
+              showToast('삭제 실패', 1400);
+            } else {
+              // remove marker from map and local array
+              const idx = permanentMarkers.findIndex(m => String(m.id) === String(id));
+              if (idx !== -1) {
+                try { permanentMarkers[idx].marker.remove(); } catch (e) { /* ignore */ }
+                permanentMarkers.splice(idx, 1);
+              }
+              const mapPopup = popupEl.closest('.maplibregl-popup');
+              if (mapPopup) mapPopup.remove();
+              showToast('삭제되었습니다', 1100);
+            }
+          }
+        } catch (err) {
+          console.error('Error deleting exhibit', err);
+          showToast('삭제 중 오류', 1500);
+        }
+      }
+    });
+
+    // simple toast for feedback
+    function showToast(msg, ms = 1400) {
+      let t = document.getElementById('wtoast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'wtoast';
+        t.style.position = 'fixed';
+        t.style.left = '50%';
+        t.style.bottom = '80px';
+        t.style.transform = 'translateX(-50%)';
+        t.style.background = 'rgba(17,24,39,0.9)';
+        t.style.color = '#fff';
+        t.style.padding = '8px 12px';
+        t.style.borderRadius = '999px';
+        t.style.fontSize = '13px';
+        t.style.zIndex = 120000;
+        t.style.transition = 'opacity 200ms';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.style.opacity = '1';
+      clearTimeout(t._hide);
+      t._hide = setTimeout(() => { t.style.opacity = '0'; }, ms);
+    }
+
+    // Review modal logic
+    const reviewForm = document.getElementById('reviewForm');
+    const reviewTitle = reviewForm.querySelector('#reviewTitle');
+    const reviewContent = reviewForm.querySelector('#reviewContent');
+    const cancelReview = reviewForm.querySelector('#cancelReview');
+    const saveReviewBtn = reviewForm.querySelector('#saveReviewBtn');
+    let _currentReviewTarget = null; // { popupEl, exhibitId }
+
+    function openReviewModal(target) {
+      _currentReviewTarget = target || null;
+      reviewTitle.value = '';
+      reviewContent.value = '';
+      reviewForm.style.display = '';
+      reviewForm.classList.add('open');
+      reviewForm.setAttribute('aria-hidden', 'false');
+      reviewTitle.focus();
+    }
+
+    function closeReviewModal() {
+      reviewForm.classList.remove('open');
+      reviewForm.setAttribute('aria-hidden', 'true');
+      reviewForm.style.display = 'none';
+      _currentReviewTarget = null;
+    }
+
+    cancelReview.addEventListener('click', () => closeReviewModal());
+
+    saveReviewBtn.addEventListener('click', async () => {
+      const title = reviewTitle.value.trim();
+      const content = reviewContent.value.trim();
+      if (!title && !content) { showToast('리뷰를 입력하세요'); return; }
+      const exhibitId = _currentReviewTarget && _currentReviewTarget.exhibitId ? _currentReviewTarget.exhibitId : null;
+      try {
+        if (typeof saveReview === 'function') {
+          const res = await saveReview({ exhibit_id: exhibitId, title, content });
+          if (res && res.error) {
+            console.error('saveReview error', res.error);
+            showToast('리뷰 저장 실패', 1400);
+          } else {
+            showToast('리뷰가 저장되었습니다', 1200);
+            closeReviewModal();
+            // refresh reviews in any open popup for this exhibit id
+            if (exhibitId) {
+              try { refreshPopupReviews(exhibitId); } catch (e) { /* ignore */ }
+            }
+          }
+        } else {
+          showToast('리뷰 기능이 준비되지 않았습니다');
+        }
+      } catch (err) {
+        console.error('Error saving review', err);
+        showToast('리뷰 저장 중 오류', 1500);
+      }
+    });
+
+    // close with Escape key
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') hideCreateForm();
+    });
+
+    // 참고: OpenFreeMap 타일을 사용하려면 tiles 배열의 URL을 OpenFreeMap의 타일 엔드포인트로 바꾸고
+    // attribution을 해당 서비스 요구사항에 맞게 수정하세요.
+  </script>
+</body>
+</html>

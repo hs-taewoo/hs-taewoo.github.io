@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>민스트라다무스 민결우스 화가전</title>
+  <!-- Page fade-in: full-screen black overlay that fades out on load -->
+  <style>
+    /* Use a fixed ::before overlay on body so the page starts black and fades out */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 2147483646;
+      opacity: 1;
+      transition: opacity 420ms ease-out;
+      pointer-events: auto;
+    }
+    body.fade-in::before {
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      requestAnimationFrame(() => document.body.classList.add('fade-in'));
+    });
+  </script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Intro overlay: 1.png 아래, 2.png 위에 겹쳐진 상태. 클릭 시 애니메이션과 음악 재생 -->
+  <div class="intro" id="intro">
+    <img src="images/1.png" class="intro-img intro-bg" id="introBg" alt="intro background">
+    <img src="images/2.png" class="intro-img intro-top" id="introTop" alt="intro top">
+    <audio id="introAudio" src="songs/music.mp3" preload="auto"></audio>
+  </div>
+  <div class="scroll-area" id="scrollArea">
+    <section class="panel"><div class="paint paint0"></div></section>
+    <section class="panel">
+      <div class="paint paint1"></div>
+    </section>
+    <!-- <section class="panel">
+      <div class="paint paint2"></div>
+    </section> -->
+    <section class="panel">
+      <div class="paint paint3"></div>
+    </section>
+    <section class="panel">
+      <div class="paint paint4"></div>
+    </section>
+    <section class="panel">
+      <div class="paint paint5" title="Paint 5"></div>
+    </section>
+    <section class="panel">
+      <div class="paint paint6" id="doorPanel" title="Enter"></div>
+    </section>
+  </div>
+
+  <div class="background"></div>
+
+  <script src="main.js"></script>
+</body>
+</html>
