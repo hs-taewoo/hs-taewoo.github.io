@@ -584,7 +584,7 @@
       }
 
       if (action === 'visit') {
-        // open a new tab / page with the exhibition name as parameter
+        // navigate in the same tab to the exhibition page
         // If the exhibit is the predefined "민스트라다무스의 화가전", go to index.html
         const titleEl = popupEl.querySelector('.ex-title');
         const name = titleEl ? titleEl.textContent.trim() : '';
@@ -596,7 +596,8 @@
             u = new URL('/visit.html', location.href);
             u.searchParams.set('name', name);
           }
-          window.open(u.toString(), '_blank');
+          // use location.assign so navigation happens in the current tab
+          location.assign(u.toString());
         } else {
           showToast('전시 이름이 없습니다');
         }

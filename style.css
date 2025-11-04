@@ -271,16 +271,61 @@ html, body {
 
 /* Card-style popup (matches design screenshot) */
 .maplibregl-popup-content .ex-popup {
-  /* aggressive compact style: very small footprint */
-  min-width: 160px;
-  max-width: 300px;
+  /* make popup wider instead of tall; allow reviews to flow horizontally */
+  min-width: 220px;
+  max-width: min(92vw, 760px);
   width: auto;
   background: #fff;
   border-radius: 10px;
-  padding: 6px 8px;
+  padding: 8px 10px;
+  /* horizontal layout: header/actions stay on top, reviews flow horizontally below */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   box-shadow: 0 10px 30px rgba(17,24,39,0.08);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial;
   color: #0f172a;
+}
+/* Ensure the MapLibre wrapper grows to fit our inner .ex-popup */
+.maplibregl-popup-content {
+  /* remove default padding/background so inner card controls visuals */
+  padding: 0 !important;
+  background: transparent !important;
+  /* allow width to be determined by content */
+  width: auto !important;
+  max-width: none !important;
+  display: inline-block; /* shrink/expand to content width */
+}
+.maplibregl-popup {
+  /* ensure the container doesn't force a narrow layout */
+  max-width: none !important;
+}
+/* Reviews list inside popup: horizontal cards with x-scroll */
+.ex-reviews {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 2px 4px 2px;
+  margin-top: 4px;
+}
+.ex-review {
+  flex: 0 0 240px; /* fixed card width so multiple reviews are side-by-side */
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 6px 12px rgba(2,6,23,0.04);
+}
+.ex-review-title { font-weight:700; font-size:13px; margin-bottom:6px; }
+.ex-review-content { font-size:13px; color:#374151; line-height:1.2; }
+.ex-review-date { font-size:11px; color:#9ca3af; margin-top:8px; }
+
+/* On narrow screens, fall back to vertical stacked reviews */
+@media screen and (max-width: 420px) {
+  .maplibregl-popup-content .ex-popup { max-width: calc(100vw - 24px); }
+  .ex-reviews { flex-direction: column; overflow-x: hidden; max-height: 220px; overflow-y: auto; }
+  .ex-review { flex: 1 1 auto; width: auto; }
 }
 .ex-popup-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ex-popup-left { display:flex; gap:8px; align-items:center; }
