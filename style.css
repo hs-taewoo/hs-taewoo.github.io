@@ -508,3 +508,20 @@ body.form-open { overflow: hidden; }
   background: #f0f0f0;
   color: #333;
 }
+
+/* Corner random jump button */
+#randomJumpBtn {
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  z-index: 140000;
+  background: #1e90ff;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(30,144,255,0.12);
+  cursor: pointer;
+}
+#randomJumpBtn:hover { transform: translateY(-1px); }
